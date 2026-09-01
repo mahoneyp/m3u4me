@@ -1,0 +1,9 @@
+services:
+  m3u4me:
+    build: .
+    container_name: m3u4me
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
