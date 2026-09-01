@@ -10,6 +10,18 @@ const DATA_DIR = path.join(process.cwd(), "data");
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+// A known Node.js/undici bug (github.com/nodejs/undici#5360) can throw an
+// uncatchable AssertionError from an internal socket handler when a fetch()
+// response body isn't fully drained before the remote server closes the
+// connection — common with flaky IPTV/EPG sources. It can't be caught with a
+// normal try/catch, so we catch it at the process level to stop one bad
+// upstream response from taking down the whole app.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (continuing):', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection (continuing):', reason);
+});
 
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
