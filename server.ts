@@ -1682,8 +1682,8 @@ async function startServer() {
     res.send(xml);
   });
 
-  // Short numeric URL: /1  /2  /3 …
-  app.get(/^\/(\d+)$/, (req, res) => {
+  // Short numeric URL: /1.m3u  /2.m3u  /3.m3u …
+  app.get(/^\/(\d+)\.m3u$/, (req, res) => {
     const shortId = parseInt(req.params[0], 10);
     const db = readDb();
     const playlist = db.playlists.find(p => p.shortId === shortId);

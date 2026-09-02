@@ -591,7 +591,7 @@ export default function PlaylistEditor({ playlistId }: { playlistId: string }) {
 
   if (!playlist) return null;
 
-  const exportUrl = `${window.location.protocol}//${window.location.host}/${playlist.shortId}`;
+  const exportUrl = `${window.location.protocol}//${window.location.host}/${playlist.shortId}.m3u`;
   const epgUrl = `${window.location.protocol}//${window.location.host}/${playlist.shortId}/epg`;
 
   /* ── Handlers ──────────────────────────────────────────────────────────── */
