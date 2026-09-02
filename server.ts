@@ -17,7 +17,12 @@ if (!fs.existsSync(DATA_DIR)) {
 // normal try/catch, so we catch it at the process level to stop one bad
 // upstream response from taking down the whole app.
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught exception (continuing):', err);
+  if (err?.name === 'AssertionError' && err?.message === 'assert(!this.paused)') {
+    console.error('Caught Node.js/undici bug #5360 (continuing):', err);
+    return;
+  }
+  console.error('Uncaught exception (fatal):', err);
+  process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection (continuing):', reason);
