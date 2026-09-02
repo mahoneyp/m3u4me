@@ -10,12 +10,6 @@ const DATA_DIR = path.join(process.cwd(), "data");
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
-// A known Node.js/undici bug (github.com/nodejs/undici#5360) can throw an
-// uncatchable AssertionError from an internal socket handler when a fetch()
-// response body isn't fully drained before the remote server closes the
-// connection — common with flaky IPTV/EPG sources. It can't be caught with a
-// normal try/catch, so we catch it at the process level to stop one bad
-// upstream response from taking down the whole app.
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception (continuing):', err);
 });
@@ -192,7 +186,10 @@ async function fetchAndParseEpg(source: EpgSource): Promise<{ channels: ParsedEp
   }
 
   const res = await fetchWithTimeout(fetchUrl, EPG_FETCH_TIMEOUT_MS);
-  if (!res.ok) throw new Error(`Failed to fetch EPG: ${res.statusText}`);
+  if (!res.ok) {
+    res.body?.cancel().catch(() => {});
+    throw new Error(`Failed to fetch EPG: ${res.statusText}`);
+  }
   const buf = await res.arrayBuffer();
   let xmlData = Buffer.from(buf);
   
@@ -276,7 +273,10 @@ async function fetchXtreamChannels(source: ChannelPoolSource): Promise<ChannelPo
   const { username, password } = source.xtreamCredentials;
   
   const catRes = await fetch(`${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`);
-  if (!catRes.ok) throw new Error(`Failed to fetch categories: ${catRes.statusText}`);
+  if (!catRes.ok) {
+    catRes.body?.cancel().catch(() => {});
+    throw new Error(`Failed to fetch categories: ${catRes.statusText}`);
+  }
   const catData = await catRes.json();
   // Xtream panels respond with HTTP 200 even for an invalid/expired login — the body is
   // an error object (e.g. {"user_info":{"auth":0}}) instead of the expected array. Treating
@@ -293,7 +293,10 @@ async function fetchXtreamChannels(source: ChannelPoolSource): Promise<ChannelPo
   }
 
   const streamsRes = await fetch(`${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_streams`);
-  if (!streamsRes.ok) throw new Error(`Failed to fetch streams: ${streamsRes.statusText}`);
+  if (!streamsRes.ok) {
+    streamsRes.body?.cancel().catch(() => {});
+    throw new Error(`Failed to fetch streams: ${streamsRes.statusText}`);
+  }
   const streamsData = await streamsRes.json();
   if (!Array.isArray(streamsData)) {
     throw new Error('Xtream server returned an unexpected response for live streams (check the URL/username/password — the login may be invalid or expired).');
@@ -376,7 +379,10 @@ function parseXspfToChannelPoolEntries(content: string, sourceId: string): Chann
 async function fetchPlaylistChannels(source: ChannelPoolSource): Promise<ChannelPoolEntry[]> {
   if (!source.url) return [];
   const res = await fetch(source.url);
-  if (!res.ok) throw new Error(`Failed to fetch playlist: ${res.statusText}`);
+  if (!res.ok) {
+    res.body?.cancel().catch(() => {});
+    throw new Error(`Failed to fetch playlist: ${res.statusText}`);
+  }
   const content = await res.text();
   if (content.trim().startsWith('<?xml') && content.includes('<playlist')) {
     return parseXspfToChannelPoolEntries(content, source.id);
@@ -1529,6 +1535,7 @@ async function startServer() {
         try {
           const r = await fetch(url, { method: 'HEAD', signal: controller.signal });
           clearTimeout(timer);
+          r.body?.cancel().catch(() => {});
           return { id, ok: r.status < 400, code: r.status };
         } catch (e: any) {
           clearTimeout(timer);
@@ -1539,6 +1546,7 @@ async function startServer() {
           try {
             const r2 = await fetch(url, { method: 'GET', signal: c2.signal });
             clearTimeout(t2);
+            r2.body?.cancel().catch(() => {});
             c2.abort();
             return { id, ok: r2.status < 400, code: r2.status };
           } catch (e2: any) {
@@ -1636,7 +1644,10 @@ async function startServer() {
     if (!targetUrl) return res.status(400).send("Missing URL");
     try {
       const response = await fetch(targetUrl);
-      if (!response.ok) throw new Error("Failed to fetch");
+      if (!response.ok) {
+        response.body?.cancel().catch(() => {});
+        throw new Error("Failed to fetch");
+      }
       const text = await response.text();
       res.setHeader("Content-Type", "text/plain");
       res.send(text);
